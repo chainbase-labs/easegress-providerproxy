@@ -34,7 +34,6 @@ type (
 )
 
 func (m *ProviderProxy) SelectNode() (*url.URL, error) {
-
 	if m.providerSelector == nil {
 		urls := m.spec.Urls
 		randomIndex := rand.Intn(len(urls))
