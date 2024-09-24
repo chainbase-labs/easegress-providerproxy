@@ -50,6 +50,10 @@ func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 
 	req := ctx.GetInputRequest().(*httpprot.Request)
 	forwardReq, err := http.NewRequestWithContext(req.Context(), req.Method(), reqUrl.String(), req.GetPayload())
+	for key := range req.HTTPHeader() {
+		forwardReq.Header.Add(key, req.HTTPHeader().Get(key))
+	}
+
 	response, err := m.client.Do(forwardReq)
 	if err != nil {
 		logger.Errorf(err.Error())
