@@ -36,6 +36,7 @@ import (
 	_ "github.com/megaease/easegress/v2/pkg/filters/opafilter"
 	_ "github.com/megaease/easegress/v2/pkg/filters/proxies/grpcproxy"
 	_ "github.com/megaease/easegress/v2/pkg/filters/proxies/httpproxy"
+	_ "github.com/megaease/easegress/v2/pkg/filters/proxies/providerproxy"
 	_ "github.com/megaease/easegress/v2/pkg/filters/ratelimiter"
 	_ "github.com/megaease/easegress/v2/pkg/filters/redirector"
 	_ "github.com/megaease/easegress/v2/pkg/filters/remotefilter"
