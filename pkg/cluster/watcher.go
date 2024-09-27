@@ -23,6 +23,7 @@ import (
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/namespace"
 
 	"github.com/megaease/easegress/v2/pkg/logger"
 )
@@ -40,7 +41,7 @@ func (c *cluster) Watcher() (Watcher, error) {
 		return nil, fmt.Errorf("get client failed: %v", err)
 	}
 
-	w := clientv3.NewWatcher(client)
+	w := namespace.NewWatcher(client.Watcher, c.opt.Cluster.Prefix)
 
 	return &watcher{
 		w:    w,
