@@ -2,7 +2,6 @@ package providerproxy
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -20,34 +19,44 @@ const (
 
 type (
 	ProviderProxy struct {
-		spec   *Spec
-		client *http.Client
+		spec             *Spec
+		client           *http.Client
+		providerSelector *ProviderSelector
 	}
 
 	Spec struct {
 		filters.BaseSpec `json:",inline"`
 
-		Urls []string `yaml:"urls"`
+		Urls     []string `yaml:"urls"`
+		Interval string   `yaml:"interval,omitempty" jsonschema:"format=duration"`
+		Lag      uint64   `yaml:"lag,omitempty" jsonschema:"default=100"`
 	}
 )
 
 func (m *ProviderProxy) SelectNode() (*url.URL, error) {
-	urls := m.spec.Urls
 
-	randomIndex := rand.Intn(len(urls))
+	if m.providerSelector == nil {
+		urls := m.spec.Urls
+		randomIndex := rand.Intn(len(urls))
+		rpcUrl := urls[randomIndex]
+		return url.Parse(rpcUrl)
+	}
 
-	rpcUrl := urls[randomIndex]
+	rpcUrl, err := m.providerSelector.ChooseServer()
+	if err != nil {
+		return nil, err
+	}
 	return url.Parse(rpcUrl)
 }
 
 func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 	reqUrl, err := m.SelectNode()
-	fmt.Println("select rpc provider:", reqUrl.String())
 	if err != nil {
 		logger.Errorf(err.Error())
 		return err.Error()
 	}
 
+	logger.Infof("select rpc provider: %s", reqUrl.String())
 	req := ctx.GetInputRequest().(*httpprot.Request)
 	forwardReq, err := http.NewRequestWithContext(req.Context(), req.Method(), reqUrl.String(), req.GetPayload())
 	for key := range req.HTTPHeader() {
@@ -81,12 +90,14 @@ var kind = &filters.Kind{
 	Results:     []string{},
 	DefaultSpec: func() filters.Spec {
 		return &Spec{
-			Urls: make([]string, 0),
+			Urls:     make([]string, 0),
+			Interval: "1s",
 		}
 	},
 	CreateInstance: func(spec filters.Spec) filters.Filter {
+		providerSpec := spec.(*Spec)
 		return &ProviderProxy{
-			spec:   spec.(*Spec),
+			spec:   providerSpec,
 			client: http.DefaultClient,
 		}
 	},
@@ -118,10 +129,29 @@ func (m *ProviderProxy) Inherit(previousGeneration filters.Filter) {
 }
 
 func (m *ProviderProxy) reload() {
+	client := http.DefaultClient
+	m.client = client
+
+	if len(m.spec.Urls) > 1 {
+		providerSelectorSpec := ProviderSelectorSpec{
+			Urls:     m.spec.Urls,
+			Interval: m.spec.Interval,
+			Lag:      m.spec.Lag,
+		}
+
+		providerSelector := NewProviderSelector(providerSelectorSpec)
+		m.providerSelector = &providerSelector
+	}
 }
 
 // Status returns status.
 func (m *ProviderProxy) Status() interface{} { return nil }
 
 // Close closes ProviderProxy.
-func (m *ProviderProxy) Close() {}
+func (m *ProviderProxy) Close() {
+	if m.providerSelector != nil {
+		ps := m.providerSelector
+		m.providerSelector = nil
+		ps.Close()
+	}
+}
