@@ -40,7 +40,6 @@ func (m *ProviderProxy) SelectNode() (*url.URL, error) {
 		rpcUrl := urls[randomIndex]
 		return url.Parse(rpcUrl)
 	}
-
 	rpcUrl, err := m.providerSelector.ChooseServer()
 	if err != nil {
 		return nil, err
