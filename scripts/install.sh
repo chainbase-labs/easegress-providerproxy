@@ -32,7 +32,7 @@ else
 fi
 
 # Third - download the binaries
-GITHUB_URL=https://github.com/megaease/easegress
+GITHUB_URL=https://github.com/chainbase-labs/easegress-providerproxy
 LATEST_RELEASE=$(curl -L -s -H 'Accept: application/json' ${GITHUB_URL}/releases/latest)
 LATEST_VERSION=$(echo $LATEST_RELEASE | sed -e 's/.*"tag_name":"\([^"]*\)".*/\1/')
 ARTIFACT="easegress-${LATEST_VERSION}-${OS}-${ARCH}.tar.gz"
@@ -53,7 +53,7 @@ echo "Extract the files successfully"
 
 # Fourth - configure the easegress
 echo "Download the config.yaml file"
-RAW_GITHUB_URL=https://raw.githubusercontent.com/megaease/easegress
+RAW_GITHUB_URL=https://raw.githubusercontent.com/chainbase-labs/easegress-providerproxy
 curl -sL ${RAW_GITHUB_URL}/main/scripts/config.yaml -o ${DIR}/config.yaml
 sed -i -e "s~##DIR##~${DIR}~g" ${DIR}/config.yaml
 

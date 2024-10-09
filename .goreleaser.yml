@@ -1,3 +1,13 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+
+# The lines below are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/need to use them.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
 before:
   hooks:
     # You may remove this if you don't use go modules.
@@ -10,7 +20,7 @@ snapshot:
 checksum:
   name_template: "checksums.txt"
 changelog:
-  skip: true
+  disable: true
 
 builds:
   - id: client
@@ -20,12 +30,13 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
+    goarch:
+      - amd64
     ldflags:
       - -s -w
       - -X github.com/easegress-io/easegress/v2/pkg/version.RELEASE={{ .Tag }}
       - -X github.com/easegress-io/easegress/v2/pkg/version.COMMIT={{.Commit}}
-      - -X github.com/easegress-io/easegress/v2/pkg/version.REPO=easegress-io/easegress
+      - -X github.com/easegress-io/easegress/v2/pkg/version.REPO=chainbase-labs/easegress-providerproxy
 
   - id: builder
     main: cmd/builder/main.go
@@ -34,12 +45,13 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
+    goarch:
+      - amd64
     ldflags:
       - -s -w
       - -X github.com/easegress-io/easegress/v2/pkg/version.RELEASE={{ .Tag }}
       - -X github.com/easegress-io/easegress/v2/pkg/version.COMMIT={{.Commit}}
-      - -X github.com/easegress-io/easegress/v2/pkg/version.REPO=easegress-io/easegress
+      - -X github.com/easegress-io/easegress/v2/pkg/version.REPO=chainbase-labs/easegress-providerproxy
 
   - id: server
     main: cmd/server/main.go
@@ -48,12 +60,13 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
+    goarch:
+      - amd64
     ldflags:
       - -s -w
       - -X github.com/easegress-io/easegress/v2/pkg/version.RELEASE={{ .Tag }}
       - -X github.com/easegress-io/easegress/v2/pkg/version.COMMIT={{.Commit}}
-      - -X github.com/easegress-io/easegress/v2/pkg/version.REPO=easegress-io/easegress
+      - -X github.com/easegress-io/easegress/v2/pkg/version.REPO=chainbase-labs/easegress-providerproxy
 
 archives:
   - id: easegress
@@ -64,17 +77,17 @@ archives:
 
 release:
   github:
-    owner: easegress-io
-    name: easegress
+    owner: chainbase-labs
+    name: easegress-providerproxy
   name_template: "{{ .ProjectName }}-v{{ .Version }}"
 
 dockers:
   - image_templates:
       # Still use MegaEase DockerHub account until we have a dedicatd one.
-      - megaease/easegress:latest
-      - megaease/easegress:{{ .Tag }}
-      - megaease/easegress:easemesh
-      - megaease/easegress:server-sidecar
+      - h00000000s/easegress:latest
+      - h00000000s/easegress:{{ .Tag }}
+      - h00000000s/easegress:easemesh
+      - h00000000s/easegress:server-sidecar
 
     goos: linux
     goarch: amd64

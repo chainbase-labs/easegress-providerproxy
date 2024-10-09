@@ -22,10 +22,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/megaease/easegress/v2/pkg/logger"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
-
-	"github.com/megaease/easegress/v2/pkg/logger"
 )
 
 type syncer struct {
@@ -78,6 +77,7 @@ func (s *syncer) watch(key string, prefix bool) (clientv3.Watcher, clientv3.Watc
 	if prefix {
 		opts = append(opts, clientv3.WithPrefix())
 	}
+
 	watcher := clientv3.NewWatcher(s.client)
 	watchChan := watcher.Watch(context.Background(), key, opts...)
 	logger.Debugf("watcher created for key %s (prefix: %v)", key, prefix)

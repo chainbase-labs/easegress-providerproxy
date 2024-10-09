@@ -1,6 +1,6 @@
 [Unit]
 Description=Easegress Gateway
-Documentation=https://github.com/megaease/easegress/tree/main/doc
+Documentation=https://github.com/chainbase-labs/easegress-providerproxy/tree/main/doc
 After=network.target
 
 [Service]

@@ -13,11 +13,11 @@ GO_PATH := $(shell go env | grep GOPATH | awk -F "=" '{print $$2}' | tr -d "'")
 INTEGRATION_TEST_PATH := build/test
 
 # Image Name
-IMAGE_NAME?=megaease/easegress
+IMAGE_NAME?=h00000000s/easegress
 BUILDER_IMAGE_NAME?=megaease/golang:1.21.7-alpine
 
 # Version
-RELEASE?=v2.7.3
+RELEASE?=v2.7.3-rc1
 
 # Git Related
 GIT_REPO_INFO=$(shell cd ${MKFILE_DIR} && git config --get remote.origin.url)
