@@ -47,7 +47,6 @@ type ClusterOptions struct {
 	// Secondary members define URLs to connect to cluster formed by primary members.
 	PrimaryListenPeerURLs []string `yaml:"primary-listen-peer-urls"`
 	MaxCallSendMsgSize    int      `yaml:"max-call-send-msg-size"`
-	Prefix                string   `yaml:"prefix"`
 }
 
 // Options is the start-up options.
@@ -120,7 +119,6 @@ func addClusterVars(opt *Options) {
 	opt.flags.StringSliceVar(&opt.Cluster.ListenPeerURLs, "listen-peer-urls", []string{"http://localhost:2380"}, "List of URLs to listen on for cluster peer traffic.")
 	opt.flags.StringSliceVar(&opt.Cluster.AdvertiseClientURLs, "advertise-client-urls", []string{"http://localhost:2379"}, "List of this member's client URLs to advertise to the rest of the cluster.")
 	opt.flags.StringSliceVar(&opt.Cluster.InitialAdvertisePeerURLs, "initial-advertise-peer-urls", []string{"http://localhost:2380"}, "List of this member's peer URLs to advertise to the rest of the cluster.")
-	opt.flags.StringVar(&opt.Cluster.Prefix, "prefix", "", "etcd default prefix namespace")
 	opt.flags.StringToStringVarP(&opt.Cluster.InitialCluster, "initial-cluster", "", nil, "List of (member name, URL) pairs that will form the cluster. E.g. primary-1=http://localhost:2380.")
 	opt.flags.StringVar(&opt.Cluster.StateFlag, "state-flag", "new", "Cluster state (new, existing)")
 	opt.flags.StringSliceVar(&opt.Cluster.PrimaryListenPeerURLs, "primary-listen-peer-urls", []string{"http://localhost:2380"}, "List of peer URLs of primary members. Define this only, when cluster-role is secondary.")

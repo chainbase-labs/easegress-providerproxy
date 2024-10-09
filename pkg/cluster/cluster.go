@@ -28,7 +28,6 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
-	"go.etcd.io/etcd/client/v3/namespace"
 	"go.etcd.io/etcd/server/v3/embed"
 
 	"github.com/megaease/easegress/v2/pkg/logger"
@@ -325,9 +324,6 @@ func (c *cluster) getClient() (*clientv3.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create client failed: %v", err)
 	}
-
-	client.KV = namespace.NewKV(client.KV, c.opt.Cluster.Prefix)
-	client.Lease = namespace.NewLease(client.Lease, c.opt.Cluster.Prefix)
 
 	logger.Infof("client is ready")
 
