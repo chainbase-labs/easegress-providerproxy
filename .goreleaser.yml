@@ -30,6 +30,8 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
+    goarch:
+      - amd64
     ldflags:
       - -s -w
       - -X github.com/easegress-io/easegress/v2/pkg/version.RELEASE={{ .Tag }}
@@ -43,6 +45,8 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
+    goarch:
+      - amd64
     ldflags:
       - -s -w
       - -X github.com/easegress-io/easegress/v2/pkg/version.RELEASE={{ .Tag }}
@@ -56,11 +60,26 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
+    goarch:
+      - amd64
     ldflags:
       - -s -w
       - -X github.com/easegress-io/easegress/v2/pkg/version.RELEASE={{ .Tag }}
       - -X github.com/easegress-io/easegress/v2/pkg/version.COMMIT={{.Commit}}
       - -X github.com/easegress-io/easegress/v2/pkg/version.REPO=chainbase-labs/easegress-providerproxy
+
+archives:
+  - id: easegress
+    format: tar.gz
+    name_template: "{{ .ProjectName }}-v{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+    files:
+      - none*
+
+release:
+  github:
+    owner: chainbase-labs
+    name: easegress-providerproxy
+  name_template: "{{ .ProjectName }}-v{{ .Version }}"
 
 dockers:
   - image_templates:
