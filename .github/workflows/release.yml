@@ -12,25 +12,8 @@ permissions:
   contents: write
 
 jobs:
-  build-package:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    steps:
-      - name: Set up Go 1.x.y
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Checkout codebase
-        uses: actions/checkout@v3
-
-      - name: Build Package
-        run: |
-          make build
   goreleaser:
     runs-on: ubuntu-latest
-    needs: build-package
     steps:
       - uses: actions/checkout@v3
         with:
