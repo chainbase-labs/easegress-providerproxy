@@ -1,15 +1,33 @@
+/*
+ * Copyright (c) 2017, The Easegress Authors
+ * All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package providerproxy
 
 import (
 	"errors"
-	"math/rand"
 	"net/http"
 	"net/url"
 
 	"github.com/megaease/easegress/v2/pkg/context"
 	"github.com/megaease/easegress/v2/pkg/filters"
+	"github.com/megaease/easegress/v2/pkg/filters/proxies/providerproxy/selector"
 	"github.com/megaease/easegress/v2/pkg/logger"
 	"github.com/megaease/easegress/v2/pkg/protocols/httpprot"
+	"github.com/megaease/easegress/v2/pkg/supervisor"
 )
 
 const (
@@ -19,9 +37,11 @@ const (
 
 type (
 	ProviderProxy struct {
+		super            *supervisor.Supervisor
 		spec             *Spec
 		client           *http.Client
-		providerSelector *ProviderSelector
+		providerSelector selector.ProviderSelector
+		metrics          *metrics
 	}
 
 	Spec struct {
@@ -30,16 +50,11 @@ type (
 		Urls     []string `yaml:"urls"`
 		Interval string   `yaml:"interval,omitempty" jsonschema:"format=duration"`
 		Lag      uint64   `yaml:"lag,omitempty" jsonschema:"default=100"`
+		Policy   string   `yaml:"policy,omitempty" jsonschema:"default=roundRobin"`
 	}
 )
 
 func (m *ProviderProxy) SelectNode() (*url.URL, error) {
-	if m.providerSelector == nil {
-		urls := m.spec.Urls
-		randomIndex := rand.Intn(len(urls))
-		rpcUrl := urls[randomIndex]
-		return url.Parse(rpcUrl)
-	}
 	rpcUrl, err := m.providerSelector.ChooseServer()
 	if err != nil {
 		return nil, err
@@ -48,6 +63,7 @@ func (m *ProviderProxy) SelectNode() (*url.URL, error) {
 }
 
 func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
+
 	reqUrl, err := m.SelectNode()
 	if err != nil {
 		logger.Errorf(err.Error())
@@ -57,11 +73,18 @@ func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 	logger.Infof("select rpc provider: %s", reqUrl.String())
 	req := ctx.GetInputRequest().(*httpprot.Request)
 	forwardReq, err := http.NewRequestWithContext(req.Context(), req.Method(), reqUrl.String(), req.GetPayload())
+	if err != nil {
+		logger.Errorf(err.Error())
+		return err.Error()
+	}
+
 	for key := range req.HTTPHeader() {
 		forwardReq.Header.Add(key, req.HTTPHeader().Get(key))
 	}
 
 	response, err := m.client.Do(forwardReq)
+	defer m.collectMetrics(reqUrl.String(), response)
+
 	if err != nil {
 		logger.Errorf(err.Error())
 		return err.Error()
@@ -73,7 +96,7 @@ func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 		return err.Error()
 	}
 
-	if err = outputResponse.FetchPayload(1024 * 1024); err != nil {
+	if err = outputResponse.FetchPayload(-1); err != nil {
 		logger.Errorf("%s: failed to fetch response payload: %v, please consider to set serverMaxBodySize of SimpleHTTPProxy to -1.", m.Name(), err)
 		return err.Error()
 	}
@@ -90,12 +113,14 @@ var kind = &filters.Kind{
 		return &Spec{
 			Urls:     make([]string, 0),
 			Interval: "1s",
+			Policy:   "roundRobin",
 		}
 	},
 	CreateInstance: func(spec filters.Spec) filters.Filter {
 		providerSpec := spec.(*Spec)
 		return &ProviderProxy{
 			spec:   providerSpec,
+			super:  spec.Super(),
 			client: http.DefaultClient,
 		}
 	},
@@ -130,16 +155,16 @@ func (m *ProviderProxy) reload() {
 	client := http.DefaultClient
 	m.client = client
 
-	if len(m.spec.Urls) > 1 {
-		providerSelectorSpec := ProviderSelectorSpec{
-			Urls:     m.spec.Urls,
-			Interval: m.spec.Interval,
-			Lag:      m.spec.Lag,
-		}
-
-		providerSelector := NewProviderSelector(providerSelectorSpec)
-		m.providerSelector = &providerSelector
+	providerSelectorSpec := selector.ProviderSelectorSpec{
+		Urls:     m.spec.Urls,
+		Interval: m.spec.Interval,
+		Lag:      m.spec.Lag,
 	}
+
+	m.metrics = m.newMetrics()
+
+	providerSelector := selector.CreateProviderSelectorByPolicy(m.spec.Policy, providerSelectorSpec, m.super)
+	m.providerSelector = providerSelector
 }
 
 // Status returns status.
