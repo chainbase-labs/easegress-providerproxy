@@ -181,13 +181,9 @@ func newMetrics(super *supervisor.Supervisor) *metrics {
 	commonLabels := prometheus.Labels{
 		"pipelineName": super.Options().Name,
 		"kind":         "BlockLagProviderSelector",
-		"clusterName":  super.Options().ClusterName,
-		"clusterRole":  super.Options().ClusterRole,
-		"instanceName": super.Options().Name,
 	}
 	prometheusLabels := []string{
-		"clusterName", "clusterRole", "instanceName", "pipelineName", "kind",
-		"provider",
+		"pipelineName", "kind", "provider",
 	}
 
 	return &metrics{

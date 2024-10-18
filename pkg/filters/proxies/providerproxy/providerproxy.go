@@ -18,6 +18,7 @@
 package providerproxy
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -28,6 +29,7 @@ import (
 	"github.com/megaease/easegress/v2/pkg/logger"
 	"github.com/megaease/easegress/v2/pkg/protocols/httpprot"
 	"github.com/megaease/easegress/v2/pkg/supervisor"
+	"github.com/megaease/easegress/v2/pkg/util/fasttime"
 )
 
 const (
@@ -62,8 +64,29 @@ func (m *ProviderProxy) SelectNode() (*url.URL, error) {
 	return url.Parse(rpcUrl)
 }
 
-func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
+func (m *ProviderProxy) ParsePayloadMethod(payload []byte) string {
+	defaultValue := "UNKNOWN"
+	if len(payload) <= 0 {
+		return defaultValue
+	}
 
+	jsonBody := map[string]interface{}{}
+	err := json.Unmarshal(payload, &jsonBody)
+	if err != nil {
+		return defaultValue
+	}
+
+	method, exists := jsonBody["method"].(string)
+	if !exists {
+		return defaultValue
+	}
+	return method
+}
+
+func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
+	requestMetrics := RequestMetrics{}
+
+	startTime := fasttime.Now()
 	reqUrl, err := m.SelectNode()
 	if err != nil {
 		logger.Errorf(err.Error())
@@ -71,7 +94,11 @@ func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 	}
 
 	logger.Infof("select rpc provider: %s", reqUrl.String())
+	requestMetrics.Provider = reqUrl.String()
 	req := ctx.GetInputRequest().(*httpprot.Request)
+
+	requestMetrics.RpcMethod = m.ParsePayloadMethod(req.RawPayload())
+
 	forwardReq, err := http.NewRequestWithContext(req.Context(), req.Method(), reqUrl.String(), req.GetPayload())
 	if err != nil {
 		logger.Errorf(err.Error())
@@ -83,7 +110,10 @@ func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 	}
 
 	response, err := m.client.Do(forwardReq)
-	defer m.collectMetrics(reqUrl.String(), response)
+
+	requestMetrics.Duration = fasttime.Since(startTime)
+	requestMetrics.StatusCode = response.StatusCode
+	defer m.collectMetrics(requestMetrics)
 
 	if err != nil {
 		logger.Errorf(err.Error())
@@ -100,7 +130,6 @@ func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 		logger.Errorf("%s: failed to fetch response payload: %v, please consider to set serverMaxBodySize of SimpleHTTPProxy to -1.", m.Name(), err)
 		return err.Error()
 	}
-
 	ctx.SetResponse(context.DefaultNamespace, outputResponse)
 	return ""
 }

@@ -1,7 +1,6 @@
 package providerproxy
 
 import (
-	"net/http"
 	"strconv"
 	"time"
 
@@ -14,20 +13,22 @@ type (
 		TotalRequests    *prometheus.CounterVec
 		RequestsDuration prometheus.ObserverVec
 	}
+
+	RequestMetrics struct {
+		Provider   string
+		RpcMethod  string
+		StatusCode int
+		Duration   time.Duration
+	}
 )
 
 func (m *ProviderProxy) newMetrics() *metrics {
-
 	commonLabels := prometheus.Labels{
 		"pipelineName": m.Name(),
 		"kind":         Kind,
-		"clusterName":  m.spec.Super().Options().ClusterName,
-		"clusterRole":  m.spec.Super().Options().ClusterRole,
-		"instanceName": m.spec.Super().Options().Name,
 	}
 	prometheusLabels := []string{
-		"clusterName", "clusterRole", "instanceName", "pipelineName", "kind",
-		"policy", "statusCode", "provider",
+		"pipelineName", "kind", "policy", "statusCode", "provider", "rpcMethod",
 	}
 
 	return &metrics{
@@ -43,18 +44,14 @@ func (m *ProviderProxy) newMetrics() *metrics {
 	}
 }
 
-type RequestStat struct {
-	StatusCode int // e.g. 200
-	Duration   time.Duration
-	Method     *string // rpc provider method e.g. eth_blockNumber
-}
-
-func (m *ProviderProxy) collectMetrics(providerUrl string, response *http.Response) {
+func (m *ProviderProxy) collectMetrics(requestMetrics RequestMetrics) {
 	labels := prometheus.Labels{
 		"policy":     m.spec.Policy,
-		"statusCode": strconv.Itoa(response.StatusCode),
-		"provider":   providerUrl,
+		"statusCode": strconv.Itoa(requestMetrics.StatusCode),
+		"provider":   requestMetrics.Provider,
+		"rpcMethod":  requestMetrics.RpcMethod,
 	}
 
 	m.metrics.TotalRequests.With(labels).Inc()
+	m.metrics.RequestsDuration.With(labels).Observe(float64(requestMetrics.Duration.Milliseconds()))
 }
