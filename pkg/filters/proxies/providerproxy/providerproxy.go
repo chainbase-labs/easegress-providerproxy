@@ -64,23 +64,40 @@ func (m *ProviderProxy) SelectNode() (*url.URL, error) {
 	return url.Parse(rpcUrl)
 }
 
-func (m *ProviderProxy) ParsePayloadMethod(payload []byte) string {
-	defaultValue := "UNKNOWN"
+func (m *ProviderProxy) ParsePayloadMethod(payload []byte) []string {
+	defaultValue := []string{"UNKNOWN"}
 	if len(payload) <= 0 {
 		return defaultValue
 	}
 
 	jsonBody := map[string]interface{}{}
 	err := json.Unmarshal(payload, &jsonBody)
+	if err == nil {
+		method, exists := jsonBody["method"].(string)
+		if !exists {
+			return defaultValue
+		}
+		return []string{method}
+	}
+
+	// parse batch call json array
+	var jsonBodyArr []map[string]interface{}
+	err = json.Unmarshal(payload, &jsonBodyArr)
 	if err != nil {
+		logger.Errorf("parse batch call err: %s, Body: %s", err, string(payload))
 		return defaultValue
 	}
 
-	method, exists := jsonBody["method"].(string)
-	if !exists {
-		return defaultValue
+	methods := make([]string, 0)
+
+	for _, item := range jsonBodyArr {
+		method, exists := item["method"].(string)
+		if !exists {
+			methods = append(methods, "UNKNOWN")
+		}
+		methods = append(methods, method)
 	}
-	return method
+	return methods
 }
 
 func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
@@ -110,15 +127,14 @@ func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 	}
 
 	response, err := m.client.Do(forwardReq)
-
-	requestMetrics.Duration = fasttime.Since(startTime)
-	requestMetrics.StatusCode = response.StatusCode
-	defer m.collectMetrics(requestMetrics)
-
 	if err != nil {
 		logger.Errorf(err.Error())
 		return err.Error()
 	}
+
+	requestMetrics.Duration = fasttime.Since(startTime)
+	requestMetrics.StatusCode = response.StatusCode
+	defer m.collectMetrics(requestMetrics)
 
 	outputResponse, err := httpprot.NewResponse(response)
 	outputResponse.Body = response.Body

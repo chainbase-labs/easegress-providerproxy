@@ -16,7 +16,7 @@ type (
 
 	RequestMetrics struct {
 		Provider   string
-		RpcMethod  string
+		RpcMethod  []string
 		StatusCode int
 		Duration   time.Duration
 	}
@@ -45,13 +45,15 @@ func (m *ProviderProxy) newMetrics() *metrics {
 }
 
 func (m *ProviderProxy) collectMetrics(requestMetrics RequestMetrics) {
-	labels := prometheus.Labels{
-		"policy":     m.spec.Policy,
-		"statusCode": strconv.Itoa(requestMetrics.StatusCode),
-		"provider":   requestMetrics.Provider,
-		"rpcMethod":  requestMetrics.RpcMethod,
-	}
+	for _, method := range requestMetrics.RpcMethod {
+		labels := prometheus.Labels{
+			"policy":     m.spec.Policy,
+			"statusCode": strconv.Itoa(requestMetrics.StatusCode),
+			"provider":   requestMetrics.Provider,
+			"rpcMethod":  method,
+		}
 
-	m.metrics.TotalRequests.With(labels).Inc()
-	m.metrics.RequestsDuration.With(labels).Observe(float64(requestMetrics.Duration.Milliseconds()))
+		m.metrics.TotalRequests.With(labels).Inc()
+		m.metrics.RequestsDuration.With(labels).Observe(float64(requestMetrics.Duration.Milliseconds() / int64(len(requestMetrics.RpcMethod))))
+	}
 }

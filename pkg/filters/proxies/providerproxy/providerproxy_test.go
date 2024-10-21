@@ -122,19 +122,22 @@ urls:
 	proxy := newTestProviderProxy(yamlConfig, assert)
 
 	method := proxy.ParsePayloadMethod([]byte("{\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1,\"jsonrpc\":\"2.0\"}"))
-	assert.Equal("eth_blockNumber", method)
+	assert.Equal([]string{"eth_blockNumber"}, method)
 
 	method = proxy.ParsePayloadMethod([]byte("{\"method\":\"eth_getBlockByNumber\",\"params\":[\"0xc5043f\",false],\"id\":1,\"jsonrpc\":\"2.0\"}"))
-	assert.Equal("eth_getBlockByNumber", method)
+	assert.Equal([]string{"eth_getBlockByNumber"}, method)
 
 	method = proxy.ParsePayloadMethod([]byte("test unknown payload"))
-	assert.Equal("UNKNOWN", method)
+	assert.Equal([]string{"UNKNOWN"}, method)
 
 	method = proxy.ParsePayloadMethod([]byte{})
-	assert.Equal("UNKNOWN", method)
+	assert.Equal([]string{"UNKNOWN"}, method)
 
 	method = proxy.ParsePayloadMethod([]byte("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"suix_getAllBalances\",\"params\":[\"0x94f1a597b4e8f709a396f7f6b1482bdcd65a673d111e49286c527fab7c2d0961\"]}"))
-	assert.Equal("suix_getAllBalances", method)
+	assert.Equal([]string{"suix_getAllBalances"}, method)
+
+	method = proxy.ParsePayloadMethod([]byte("[{\"jsonrpc\": \"2.0\", \"method\": \"eth_getTransactionReceipt\", \"params\": [\"0x7363bf80269875c6ddd3de0089baf0a9af28586dd0e536753d1cbb5eb9d6535b\"], \"id\": 0}, {\"jsonrpc\": \"2.0\", \"method\": \"eth_getTransactionReceipt\", \"params\": [\"0x29696eba0fa0eb5eb4c1495174c6fb37a9e64a3707dc8b64c9d19a650c8e1b5f\"], \"id\": 1}, {\"jsonrpc\": \"2.0\", \"method\": \"eth_getTransactionReceipt\", \"params\": [\"0x8f9631d0fd6a056e422ed0eea938a84b1eca3344729789f4465861c6406c2114\"], \"id\": 2}, {\"jsonrpc\": \"2.0\", \"method\": \"eth_getTransactionReceipt\", \"params\": [\"0x4787c3d707ff6d204590c77f672917dca49c36ec0381d6dea10d84981d008ec5\"], \"id\": 3}, {\"jsonrpc\": \"2.0\", \"method\": \"eth_getTransactionReceipt\", \"params\": [\"0x11132ec86262aa67b27f64a5f5a6550c7b86f85dabe3d824dbab0f20283f9aa6\"], \"id\": 4}, {\"jsonrpc\": \"2.0\", \"method\": \"eth_getTransactionReceipt\", \"params\": [\"0x8efac98473a7cdb5c40ca503089794b06723c09791833c2df5b4732ea5a10451\"], \"id\": 5}, {\"jsonrpc\": \"2.0\", \"method\": \"eth_getTransactionReceipt\", \"params\": [\"0x7df0d4c1b2d1a570a1367a8bd09301f8e6af5ffa03a2b97a693ba440bb87b002\"], \"id\": 6}, {\"jsonrpc\": \"2.0\", \"method\": \"eth_getTransactionReceipt\", \"params\": [\"0x7d473c856b0b8d207c43e46a3327217e809142ad5497109d01ec72d6a1bde45c\"], \"id\": 7}, {\"jsonrpc\": \"2.0\", \"method\": \"eth_getTransactionReceipt\", \"params\": [\"0x512013ff4a44b6604b81f63e330d57a63b03f23dae011753be8c168ce8f6fcc7\"], \"id\": 8}, {\"jsonrpc\": \"2.0\", \"method\": \"eth_getTransactionReceipt\", \"params\": [\"0x438abc4bfc9a46296f191ad3ecc742bbd7da9286a2a92fe8f27f2d0168a19661\"], \"id\": 9}]"))
+	assert.Equal([]string{"eth_getTransactionReceipt", "eth_getTransactionReceipt", "eth_getTransactionReceipt", "eth_getTransactionReceipt", "eth_getTransactionReceipt", "eth_getTransactionReceipt", "eth_getTransactionReceipt", "eth_getTransactionReceipt", "eth_getTransactionReceipt", "eth_getTransactionReceipt"}, method)
 
 	proxy.Close()
 }
