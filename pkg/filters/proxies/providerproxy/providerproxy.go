@@ -102,7 +102,7 @@ func (m *ProviderProxy) ParsePayloadMethod(payload []byte) []string {
 }
 
 func (m *ProviderProxy) HandleRequest(req *httpprot.Request, providerUrl *url.URL) (forwardReq *http.Request, method []string, err error) {
-	if len(req.URL().Path) != 0 {
+	if len(req.URL().Path) != 0 && req.URL().Path != "/" {
 		providerUrl = providerUrl.JoinPath(req.URL().Path)
 		method = []string{req.URL().Path}
 	} else {
