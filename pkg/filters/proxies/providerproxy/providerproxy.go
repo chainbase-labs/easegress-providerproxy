@@ -30,6 +30,7 @@ import (
 	"github.com/megaease/easegress/v2/pkg/protocols/httpprot"
 	"github.com/megaease/easegress/v2/pkg/supervisor"
 	"github.com/megaease/easegress/v2/pkg/util/fasttime"
+	"github.com/megaease/easegress/v2/pkg/util/readers"
 )
 
 const (
@@ -100,6 +101,19 @@ func (m *ProviderProxy) ParsePayloadMethod(payload []byte) []string {
 	return methods
 }
 
+func (m *ProviderProxy) HandleRequest(req *httpprot.Request, providerUrl *url.URL) (forwardReq *http.Request, method []string, err error) {
+	if len(req.URL().Path) != 0 {
+		providerUrl = providerUrl.JoinPath(req.URL().Path)
+		method = []string{req.URL().Path}
+	} else {
+		bodyBytes := req.RawPayload()
+		method = m.ParsePayloadMethod(bodyBytes)
+	}
+
+	forwardReq, err = http.NewRequestWithContext(req.Context(), req.Method(), providerUrl.String(), req.GetPayload())
+	return
+}
+
 func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 	requestMetrics := RequestMetrics{}
 
@@ -113,10 +127,8 @@ func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 	logger.Infof("select rpc provider: %s", reqUrl.String())
 	requestMetrics.Provider = reqUrl.String()
 	req := ctx.GetInputRequest().(*httpprot.Request)
+	forwardReq, method, err := m.HandleRequest(req, reqUrl)
 
-	requestMetrics.RpcMethod = m.ParsePayloadMethod(req.RawPayload())
-
-	forwardReq, err := http.NewRequestWithContext(req.Context(), req.Method(), reqUrl.String(), req.GetPayload())
 	if err != nil {
 		logger.Errorf(err.Error())
 		return err.Error()
@@ -127,24 +139,35 @@ func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 	}
 
 	response, err := m.client.Do(forwardReq)
+
 	if err != nil {
 		logger.Errorf(err.Error())
 		return err.Error()
 	}
 
+	requestMetrics.RpcMethod = method
 	requestMetrics.Duration = fasttime.Since(startTime)
 	requestMetrics.StatusCode = response.StatusCode
 	defer m.collectMetrics(requestMetrics)
 
+	body := readers.NewCallbackReader(response.Body)
+	response.Body = body
 	outputResponse, err := httpprot.NewResponse(response)
-	outputResponse.Body = response.Body
+
 	if err != nil {
+		logger.Errorf(err.Error())
+		response.Body.Close()
 		return err.Error()
 	}
 
 	if err = outputResponse.FetchPayload(-1); err != nil {
 		logger.Errorf("%s: failed to fetch response payload: %v, please consider to set serverMaxBodySize of SimpleHTTPProxy to -1.", m.Name(), err)
+		response.Body.Close()
 		return err.Error()
+	}
+
+	if !outputResponse.IsStream() {
+		response.Body.Close()
 	}
 	ctx.SetResponse(context.DefaultNamespace, outputResponse)
 	return ""

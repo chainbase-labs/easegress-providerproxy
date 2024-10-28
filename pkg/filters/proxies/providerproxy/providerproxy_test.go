@@ -97,6 +97,7 @@ urls:
   - https://eth.llamarpc.com
 `
 	proxy := newTestProviderProxy(yamlConfig, assert)
+	defer proxy.Close()
 
 	postData := "{\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1,\"jsonrpc\":\"2.0\"}"
 
@@ -106,8 +107,27 @@ urls:
 	response := proxy.Handle(ctx)
 	assert.Equal("", response)
 	assert.NotNil(ctx.GetResponse(context.DefaultNamespace).GetPayload())
+}
 
-	proxy.Close()
+func TestURLProviderProxy(t *testing.T) {
+	assert := assert.New(t)
+
+	const yamlConfig = `
+name: tron-providerProxy
+kind: ProviderProxy
+urls:
+  - https://docs-demo.tron-mainnet.quiknode.pro
+`
+	proxy := newTestProviderProxy(yamlConfig, assert)
+	defer proxy.Close()
+
+	postData := "{\"id_or_num\":\"66484052\",\"detail\":false}"
+	stdr, _ := http.NewRequest(http.MethodPost, "https://rpc.tron.network/wallet/getblock", strings.NewReader(postData))
+	stdr.Header.Set("Content-Type", "application/json")
+	ctx := getCtx(stdr)
+	response := proxy.Handle(ctx)
+	assert.Equal("", response)
+	assert.NotNil(ctx.GetResponse(context.DefaultNamespace).GetPayload())
 }
 
 func TestProviderProxy_ParsePayloadMethod(t *testing.T) {
