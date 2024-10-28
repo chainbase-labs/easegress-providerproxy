@@ -22,9 +22,11 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/megaease/easegress/v2/pkg/context"
 	"github.com/megaease/easegress/v2/pkg/filters"
+	proxy "github.com/megaease/easegress/v2/pkg/filters/proxies/httpproxy"
 	"github.com/megaease/easegress/v2/pkg/filters/proxies/providerproxy/selector"
 	"github.com/megaease/easegress/v2/pkg/logger"
 	"github.com/megaease/easegress/v2/pkg/protocols/httpprot"
@@ -54,6 +56,10 @@ type (
 		Interval string   `yaml:"interval,omitempty" jsonschema:"format=duration"`
 		Lag      uint64   `yaml:"lag,omitempty" jsonschema:"default=100"`
 		Policy   string   `yaml:"policy,omitempty" jsonschema:"default=roundRobin"`
+
+		MaxIdleConns        int `json:"maxIdleConns,omitempty"`
+		MaxIdleConnsPerHost int `json:"maxIdleConnsPerHost,omitempty"`
+		MaxRedirection      int `json:"maxRedirection,omitempty"`
 	}
 )
 
@@ -104,7 +110,8 @@ func (m *ProviderProxy) ParsePayloadMethod(payload []byte) []string {
 func (m *ProviderProxy) HandleRequest(req *httpprot.Request, providerUrl *url.URL) (forwardReq *http.Request, method []string, err error) {
 	if len(req.URL().Path) != 0 && req.URL().Path != "/" {
 		providerUrl = providerUrl.JoinPath(req.URL().Path)
-		method = []string{req.URL().Path}
+		pathMethod := strings.Replace(req.URL().Path, "//", "/", -1)
+		method = []string{pathMethod}
 	} else {
 		bodyBytes := req.RawPayload()
 		method = m.ParsePayloadMethod(bodyBytes)
@@ -182,6 +189,9 @@ var kind = &filters.Kind{
 			Urls:     make([]string, 0),
 			Interval: "1s",
 			Policy:   "roundRobin",
+
+			MaxIdleConns:        10240,
+			MaxIdleConnsPerHost: 1024,
 		}
 	},
 	CreateInstance: func(spec filters.Spec) filters.Filter {
@@ -220,7 +230,13 @@ func (m *ProviderProxy) Inherit(previousGeneration filters.Filter) {
 }
 
 func (m *ProviderProxy) reload() {
-	client := http.DefaultClient
+	clientSpec := &proxy.HTTPClientSpec{
+		MaxIdleConns:        m.spec.MaxIdleConns,
+		MaxIdleConnsPerHost: m.spec.MaxIdleConnsPerHost,
+		MaxRedirection:      &m.spec.MaxRedirection,
+	}
+
+	client := proxy.HTTPClient(nil, clientSpec, 0)
 	m.client = client
 
 	providerSelectorSpec := selector.ProviderSelectorSpec{
