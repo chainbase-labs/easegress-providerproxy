@@ -22,14 +22,17 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/megaease/easegress/v2/pkg/context"
 	"github.com/megaease/easegress/v2/pkg/filters"
+	proxy "github.com/megaease/easegress/v2/pkg/filters/proxies/httpproxy"
 	"github.com/megaease/easegress/v2/pkg/filters/proxies/providerproxy/selector"
 	"github.com/megaease/easegress/v2/pkg/logger"
 	"github.com/megaease/easegress/v2/pkg/protocols/httpprot"
 	"github.com/megaease/easegress/v2/pkg/supervisor"
 	"github.com/megaease/easegress/v2/pkg/util/fasttime"
+	"github.com/megaease/easegress/v2/pkg/util/readers"
 )
 
 const (
@@ -53,6 +56,10 @@ type (
 		Interval string   `yaml:"interval,omitempty" jsonschema:"format=duration"`
 		Lag      uint64   `yaml:"lag,omitempty" jsonschema:"default=100"`
 		Policy   string   `yaml:"policy,omitempty" jsonschema:"default=roundRobin"`
+
+		MaxIdleConns        int `json:"maxIdleConns,omitempty"`
+		MaxIdleConnsPerHost int `json:"maxIdleConnsPerHost,omitempty"`
+		MaxRedirection      int `json:"maxRedirection,omitempty"`
 	}
 )
 
@@ -100,6 +107,20 @@ func (m *ProviderProxy) ParsePayloadMethod(payload []byte) []string {
 	return methods
 }
 
+func (m *ProviderProxy) HandleRequest(req *httpprot.Request, providerUrl *url.URL) (forwardReq *http.Request, method []string, err error) {
+	if len(req.URL().Path) != 0 && req.URL().Path != "/" {
+		providerUrl = providerUrl.JoinPath(req.URL().Path)
+		pathMethod := strings.Replace(req.URL().Path, "//", "/", -1)
+		method = []string{pathMethod}
+	} else {
+		bodyBytes := req.RawPayload()
+		method = m.ParsePayloadMethod(bodyBytes)
+	}
+
+	forwardReq, err = http.NewRequestWithContext(req.Context(), req.Method(), providerUrl.String(), req.GetPayload())
+	return
+}
+
 func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 	requestMetrics := RequestMetrics{}
 
@@ -113,10 +134,8 @@ func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 	logger.Infof("select rpc provider: %s", reqUrl.String())
 	requestMetrics.Provider = reqUrl.String()
 	req := ctx.GetInputRequest().(*httpprot.Request)
+	forwardReq, method, err := m.HandleRequest(req, reqUrl)
 
-	requestMetrics.RpcMethod = m.ParsePayloadMethod(req.RawPayload())
-
-	forwardReq, err := http.NewRequestWithContext(req.Context(), req.Method(), reqUrl.String(), req.GetPayload())
 	if err != nil {
 		logger.Errorf(err.Error())
 		return err.Error()
@@ -127,24 +146,35 @@ func (m *ProviderProxy) Handle(ctx *context.Context) (result string) {
 	}
 
 	response, err := m.client.Do(forwardReq)
+
 	if err != nil {
 		logger.Errorf(err.Error())
 		return err.Error()
 	}
 
+	requestMetrics.RpcMethod = method
 	requestMetrics.Duration = fasttime.Since(startTime)
 	requestMetrics.StatusCode = response.StatusCode
 	defer m.collectMetrics(requestMetrics)
 
+	body := readers.NewCallbackReader(response.Body)
+	response.Body = body
 	outputResponse, err := httpprot.NewResponse(response)
-	outputResponse.Body = response.Body
+
 	if err != nil {
+		logger.Errorf(err.Error())
+		response.Body.Close()
 		return err.Error()
 	}
 
 	if err = outputResponse.FetchPayload(-1); err != nil {
 		logger.Errorf("%s: failed to fetch response payload: %v, please consider to set serverMaxBodySize of SimpleHTTPProxy to -1.", m.Name(), err)
+		response.Body.Close()
 		return err.Error()
+	}
+
+	if !outputResponse.IsStream() {
+		response.Body.Close()
 	}
 	ctx.SetResponse(context.DefaultNamespace, outputResponse)
 	return ""
@@ -159,6 +189,9 @@ var kind = &filters.Kind{
 			Urls:     make([]string, 0),
 			Interval: "1s",
 			Policy:   "roundRobin",
+
+			MaxIdleConns:        10240,
+			MaxIdleConnsPerHost: 1024,
 		}
 	},
 	CreateInstance: func(spec filters.Spec) filters.Filter {
@@ -197,7 +230,13 @@ func (m *ProviderProxy) Inherit(previousGeneration filters.Filter) {
 }
 
 func (m *ProviderProxy) reload() {
-	client := http.DefaultClient
+	clientSpec := &proxy.HTTPClientSpec{
+		MaxIdleConns:        m.spec.MaxIdleConns,
+		MaxIdleConnsPerHost: m.spec.MaxIdleConnsPerHost,
+		MaxRedirection:      &m.spec.MaxRedirection,
+	}
+
+	client := proxy.HTTPClient(nil, clientSpec, 0)
 	m.client = client
 
 	providerSelectorSpec := selector.ProviderSelectorSpec{
