@@ -240,6 +240,7 @@ func (m *ProviderProxy) reload() {
 	m.client = client
 
 	providerSelectorSpec := selector.ProviderSelectorSpec{
+		Name:     m.spec.BaseSpec.Name(),
 		Urls:     m.spec.Urls,
 		Interval: m.spec.Interval,
 		Lag:      m.spec.Lag,
@@ -247,7 +248,7 @@ func (m *ProviderProxy) reload() {
 
 	m.metrics = m.newMetrics()
 
-	providerSelector := selector.CreateProviderSelectorByPolicy(m.spec.Policy, providerSelectorSpec, m.super)
+	providerSelector := selector.CreateProviderSelectorByPolicy(m.spec.Policy, providerSelectorSpec)
 	m.providerSelector = providerSelector
 }
 

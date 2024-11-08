@@ -25,7 +25,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/megaease/easegress/v2/pkg/logger"
-	"github.com/megaease/easegress/v2/pkg/supervisor"
 	"github.com/megaease/easegress/v2/pkg/util/prometheushelper"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
@@ -44,7 +43,7 @@ type BlockLagProviderSelector struct {
 	metrics   *metrics
 }
 
-func NewBlockLagProviderSelector(spec ProviderSelectorSpec, super *supervisor.Supervisor) ProviderSelector {
+func NewBlockLagProviderSelector(spec ProviderSelectorSpec) ProviderSelector {
 
 	providers := make([]ProviderWeight, 0)
 
@@ -67,7 +66,7 @@ func NewBlockLagProviderSelector(spec ProviderSelectorSpec, super *supervisor.Su
 		done:      make(chan struct{}),
 		providers: providers,
 		lag:       spec.Lag,
-		metrics:   newMetrics(super),
+		metrics:   newMetrics(spec),
 	}
 	ticker := time.NewTicker(intervalDuration)
 	ps.checkServers()
@@ -177,9 +176,9 @@ type metrics struct {
 	ProviderBlockHeight *prometheus.GaugeVec
 }
 
-func newMetrics(super *supervisor.Supervisor) *metrics {
+func newMetrics(spec ProviderSelectorSpec) *metrics {
 	commonLabels := prometheus.Labels{
-		"pipelineName": super.Options().Name,
+		"pipelineName": spec.Name,
 		"kind":         "BlockLagProviderSelector",
 	}
 	prometheusLabels := []string{
