@@ -131,7 +131,9 @@ func (ps BlockLagProviderSelector) checkServers() {
 
 	for i := 0; i < len(ps.providers); i++ {
 		blockIndex := <-blockNumberChannel
-		ps.providers[blockIndex.index].BlockNumber = blockIndex.block
+		if blockIndex.block != 0 {
+			ps.providers[blockIndex.index].BlockNumber = blockIndex.block
+		}
 		labels := prometheus.Labels{
 			"provider": ps.providers[blockIndex.index].Url,
 		}
@@ -159,6 +161,7 @@ func (ps BlockLagProviderSelector) ChooseServer() (string, error) {
 		if provider.BlockNumber == 0 {
 			continue
 		}
+		logger.Infof("provider: %s, block number: %d", provider.Url, provider.BlockNumber)
 		if provider.BlockNumber > bestProvider.BlockNumber &&
 			(provider.BlockNumber-bestProvider.BlockNumber) >= ps.lag {
 			bestProvider = provider
