@@ -19,11 +19,10 @@ package selector
 
 import (
 	"time"
-
-	"github.com/megaease/easegress/v2/pkg/supervisor"
 )
 
 type ProviderSelectorSpec struct {
+	Name     string   `json:"name"`
 	Urls     []string `json:"urls"`
 	Interval string   `json:"interval,omitempty" jsonschema:"format=duration"`
 	Lag      uint64   `json:"lag,omitempty" jsonschema:"default=100"`
@@ -43,10 +42,10 @@ type ProviderSelector interface {
 	Close()
 }
 
-func CreateProviderSelectorByPolicy(policy string, spec ProviderSelectorSpec, super *supervisor.Supervisor) ProviderSelector {
+func CreateProviderSelectorByPolicy(policy string, spec ProviderSelectorSpec) ProviderSelector {
 	switch policy {
 	case "blockLag":
-		return NewBlockLagProviderSelector(spec, super)
+		return NewBlockLagProviderSelector(spec)
 	case "roundRobin":
 		return NewRoundRobinProviderSelector(spec)
 	default:
